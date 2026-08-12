@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="JEE Tracker"/>
+<meta name="description" content="Track JEE Class 11 & 12 chapters"/>
+<title>JEE Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;transition:background 0.3s}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,textarea{font-family:inherit}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{border-radius:4px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useCallback,useRef}=React;
+
+/* ── THEMES ── */
+const DARK={
+  bg:"#0B0F14",surface:"#141B24",raised:"#1A2330",
+  border:"#232E3C",borderL:"#2E3A4A",
+  text:"#E9EDF2",muted:"#8B96A5",faint:"#54606F",
+  physics:"#5EA3E0",physicsDim:"rgba(94,163,224,0.14)",
+  chem:"#4FBE96",chemDim:"rgba(79,190,150,0.14)",
+  maths:"#A98CE0",mathsDim:"rgba(169,140,224,0.14)",
+  danger:"#E0705A",card:"#141B24",scrollThumb:"#232E3C",
+};
+const LIGHT={
+  bg:"#EEF2F8",surface:"#FFFFFF",raised:"#F5F7FA",
+  border:"#D8E0EC",borderL:"#C8D4E4",
+  text:"#0E1520",muted:"#4A5568",faint:"#8896A8",
+  physics:"#1A7ACF",physicsDim:"rgba(26,122,207,0.1)",
+  chem:"#0F9E6E",chemDim:"rgba(15,158,110,0.1)",
+  maths:"#7C52CC",mathsDim:"rgba(124,82,204,0.1)",
+  danger:"#D04030",card:"#FFFFFF",scrollThumb:"#C8D4E4",
+};
+
+/* ── SUBJECTS ── */
+const SM={
+  physics:{label:"Physics",icon:"⚡"},
+  chemistry:{label:"Chemistry",icon:"🧪"},
+  maths:{label:"Mathematics",icon:"📐"},
+};
+const SO=["physics","chemistry","maths"];
+
+/* ── DATA ── */
+const CH_DATA={
+  11:{
+    physics:["Units and Measurements","Motion in a Straight Line","Motion in a Plane","Laws of Motion","Work, Energy and Power","System of Particles and Rotational Motion","Gravitation","Mechanical Properties of Solids","Mechanical Properties of Fluids","Thermal Properties of Matter","Thermodynamics","Kinetic Theory","Oscillations","Waves"],
+    chemistry:["Some Basic Concepts of Chemistry","Structure of Atom","Classification of Elements and Periodicity","Chemical Bonding and Molecular Structure","States of Matter","Thermodynamics","Equilibrium","Redox Reactions","Hydrogen","The s-Block Elements","The p-Block Elements","Organic Chemistry — Basic Principles","Hydrocarbons"],
+    maths:["Sets","Relations and Functions","Trigonometric Functions","Complex Numbers and Quadratic Equations","Linear Inequalities","Permutations and Combinations","Binomial Theorem","Sequences and Series","Straight Lines","Conic Sections","Introduction to 3D Geometry","Limits and Derivatives","Statistics","Probability"],
+  },
+  12:{
+    physics:["Electric Charges and Fields","Electrostatic Potential and Capacitance","Current Electricity","Moving Charges and Magnetism","Magnetism and Matter","Electromagnetic Induction","Alternating Current","Electromagnetic Waves","Ray Optics and Optical Instruments","Wave Optics","Dual Nature of Radiation and Matter","Atoms","Nuclei","Semiconductor Electronics"],
+    chemistry:["The Solid State","Solutions","Electrochemistry","Chemical Kinetics","The d- and f-Block Elements","Coordination Compounds","Haloalkanes and Haloarenes","Alcohols, Phenols and Ethers","Aldehydes, Ketones and Carboxylic Acids","Amines","Biomolecules"],
+    maths:["Relations and Functions","Inverse Trigonometric Functions","Matrices","Determinants","Continuity and Differentiability","Application of Derivatives","Integrals","Application of Integrals","Differential Equations","Vector Algebra","Three Dimensional Geometry","Linear Programming","Probability"],
+  },
+};
+function buildDefault(){
+  const out=[];let n=1;
+  [11,12].forEach(cls=>SO.forEach(sub=>CH_DATA[cls][sub].forEach((name,i)=>out.push({id:`c${n++}`,cls,sub,name,done:false,notes:"",order:i}))));
+  return out;
+}
+
+/* ── STORAGE ── */
+const KEY="jee-v2";
+function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return null;}
+function save(d){try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}}
+const TKEY="jee-theme";
+function loadTheme(){try{return localStorage.getItem(TKEY)||"dark";}catch(e){return"dark";}}
+
+/* ── UTILS ── */
+const pct=(d,t)=>t?Math.round(d/t*100):0;
+function stats(list,fn){const a=list.filter(fn);const d=a.filter(x=>x.done).length;return{done:d,total:a.length,left:a.length-d,pct:pct(d,a.length)};}
+
+/* ── LOGO SVG ── */
+function Logo({size=52}){
+  return(
+    <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="jBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#141C2B"/><stop offset="100%" stopColor="#0A0F18"/></linearGradient>
+        <linearGradient id="jW" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#4A9FE0"/><stop offset="100%" stopColor="#FFFFFF"/></linearGradient>
+        <clipPath id="sq"><rect width="100" height="100" rx="20"/></clipPath>
+      </defs>
+      <g clipPath="url(#sq)">
+        <rect width="100" height="100" fill="url(#jBg)"/>
+        {/* Ring arcs */}
+        <path d="M 28 80 A 42 42 0 0 1 50 8" fill="none" stroke="#E8961A" strokeWidth="5" strokeLinecap="round"/>
+        <path d="M 50 8 A 42 42 0 0 1 72 80" fill="none" stroke="#5BBF3C" strokeWidth="5" strokeLinecap="round"/>
+        <path d="M 72 80 A 42 42 0 0 1 28 80" fill="none" stroke="#2B7ED4" strokeWidth="5" strokeLinecap="round"/>
+        {/* Graduation cap */}
+        <polygon points="50,13 63,20 50,26 37,20" fill="white"/>
+        <rect x="47" y="20" width="6" height="5" fill="#dde4f0"/>
+        <line x1="63" y1="21" x2="65" y2="28" stroke="#D9A441" strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="65" cy="29" r="2" fill="#D9A441"/>
+        {/* Book */}
+        <path d="M50 27 C43 25 34 27 32 32 L32 44 C34 40 43 38 50 40Z" fill="white"/>
+        <path d="M50 27 C57 25 66 27 68 32 L68 44 C66 40 57 38 50 40Z" fill="#edf0f5"/>
+        <line x1="50" y1="27" x2="50" y2="40" stroke="#c8d0de" strokeWidth="1"/>
+        {/* Checkmark */}
+        <path d="M38 35 L46 42 L62 28" fill="none" stroke="#1a2a40" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* Atom left */}
+        <g transform="translate(22,33)">
+          <ellipse rx="9" ry="3.2" fill="none" stroke="#E8961A" strokeWidth="1.4"/>
+          <ellipse rx="9" ry="3.2" fill="none" stroke="#E8961A" strokeWidth="1.4" transform="rotate(60)"/>
+          <ellipse rx="9" ry="3.2" fill="none" stroke="#E8961A" strokeWidth="1.4" transform="rotate(120)"/>
+          <circle r="2" fill="#E8961A"/>
+        </g>
+        {/* Flask right */}
+        <rect x="69" y="25" width="5" height="8" rx="1.5" fill="none" stroke="#5BBF3C" strokeWidth="1.4"/>
+        <polygon points="69,33 74,33 81,46 62,46" fill="rgba(91,191,60,0.18)" stroke="#5BBF3C" strokeWidth="1.4" strokeLinejoin="round"/>
+        <circle cx="66" cy="41" r="1.4" fill="#5BBF3C"/>
+        <circle cx="70.5" cy="43.5" r="1" fill="#5BBF3C"/>
+        {/* √x */}
+        <text x="50" y="53" textAnchor="middle" fill="#4A9FE0" fontFamily="Georgia,serif" fontStyle="italic" fontSize="7" fontWeight="bold">√x</text>
+        {/* JEE TRACKER */}
+        <text x="50" y="63" textAnchor="middle" fontFamily="Arial Black,sans-serif" fontSize="13" fontWeight="900" letterSpacing="0.3">
+          <tspan fill="#4A9FE0">JEE </tspan><tspan fill="white">TRACKER</tspan>
+        </text>
+        {/* Divider */}
+        <line x1="20" y1="67" x2="43" y2="67" stroke="#E8961A" strokeWidth="1"/>
+        <circle cx="50" cy="67" r="1.2" fill="#8896A5"/>
+        <line x1="57" y1="67" x2="80" y2="67" stroke="#5BBF3C" strokeWidth="1"/>
+        {/* Subtitles */}
+        <text x="50" y="72" textAnchor="middle" fill="white" fontFamily="Arial,sans-serif" fontSize="4" letterSpacing="0.4">MASTER CLASS 11 &amp; 12</text>
+        <text x="50" y="77" textAnchor="middle" fill="#4A9FE0" fontFamily="Arial,sans-serif" fontSize="3.5">ONE CHAPTER AT A TIME</text>
+        {/* Bar chart */}
+        <rect x="37" y="88" width="4" height="5" rx="1" fill="#2B7ED4"/>
+        <rect x="42" y="85" width="4" height="8" rx="1" fill="#2B7ED4"/>
+        <rect x="47" y="82" width="4" height="11" rx="1" fill="#3B8FE4"/>
+        <rect x="52" y="79" width="4" height="14" rx="1" fill="#4B9FEE"/>
+        <line x1="36" y1="93" x2="58" y2="79" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+        <polygon points="58,79 55,79.8 56.5,82.5" fill="white"/>
+      </g>
+    </svg>
+  );
+}
+
+/* ── GAUGE ── */
+function Gauge({pct:p,t}){
+  const s=14,r=90,cx=110,cy=110;
+  const pt=a=>({x:cx+r*Math.cos(a*Math.PI/180),y:cy+r*Math.sin(a*Math.PI/180)});
+  const arc=(a0,a1)=>{const p0=pt(a0),p1=pt(a1);return`M${p0.x} ${p0.y} A${r} ${r} 0 ${(a1-a0)>180?1:0} 1 ${p1.x} ${p1.y}`;};
+  const ang=-180+(p/100)*180;
+  return(
+    <svg width="220" height="128" viewBox="0 0 220 128">
+      <path d={arc(-180,0)} fill="none" stroke={t.border} strokeWidth={s} strokeLinecap="round"/>
+      <path d={arc(-180,ang)} fill="none" stroke={t.text} strokeWidth={s} strokeLinecap="round"/>
+      <text x="110" y="102" textAnchor="middle" fill={t.text} fontFamily="'JetBrains Mono',monospace" fontSize="34" fontWeight="700">{p}%</text>
+      <text x="110" y="120" textAnchor="middle" fill={t.muted} fontFamily="'Inter',sans-serif" fontSize="11" letterSpacing="1.2">OVERALL PROGRESS</text>
+    </svg>
+  );
+}
+
+/* ── TICK BAR ── */
+function TickBar({pct:p,color}){
+  const n=20,f=Math.round(p/100*n);
+  return(<div style={{display:"flex",gap:3}}>{Array.from({length:n}).map((_,i)=><div key={i} style={{height:12,width:5,borderRadius:2,background:i<f?color:"var(--bdr)",transition:"background 0.25s"}}/>)}</div>);
+}
+
+/* ── PILL ── */
+function Pill({active,onClick,children,color,t}){
+  return(<button onClick={onClick} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:600,border:`1px solid ${active?(color||t.text):t.border}`,background:active?(color?color+"22":t.raised):"transparent",color:active?(color||t.text):t.muted,transition:"all 0.15s",whiteSpace:"nowrap"}}>{children}</button>);
+}
+
+/* ── SUBJECT CARD ── */
+function SubCard({sub,chapters,onOpen,t}){
+  const m=SM[sub];
+  const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[sub];
+  const dim={physics:t.physicsDim,chemistry:t.chemDim,maths:t.mathsDim}[sub];
+  const s11=stats(chapters,c=>c.sub===sub&&c.cls===11);
+  const s12=stats(chapters,c=>c.sub===sub&&c.cls===12);
+  const ov=stats(chapters,c=>c.sub===sub);
+  return(
+    <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:16,padding:18,display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:dim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{m.icon}</div>
+          <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:14,color:t.text}}>{m.label.toUpperCase()}</span>
+        </div>
+        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:20,fontWeight:700,color:col}}>{ov.pct}%</span>
+      </div>
+      {[[11,s11],[12,s12]].map(([cl,s])=>(
+        <button key={cl} onClick={()=>onOpen(sub,cl)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"transparent",border:"none",padding:"4px 0",cursor:"pointer"}}>
+          <span style={{fontSize:13,color:t.muted}}>Class {cl}</span>
+          <span style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:t.text}}>{s.done}/{s.total}</span>
+            <span style={{color:t.faint,fontSize:16}}>›</span>
+          </span>
+        </button>
+      ))}
+      <div style={{borderTop:`1px solid ${t.border}`,paddingTop:10,display:"flex",flexDirection:"column",gap:7}}>
+        <div style={{display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:11,color:t.faint,letterSpacing:"0.06em"}}>OVERALL</span>
+          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:t.muted}}>{ov.done}/{ov.total}</span>
+        </div>
+        <TickBar pct={ov.pct} color={col}/>
+      </div>
+    </div>
+  );
+}
+
+/* ── DASHBOARD ── */
+function Dashboard({chapters,onOpen,onSearch,t}){
+  const ov=stats(chapters,()=>true);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:24}}>
+      <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:18,padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+        <Gauge pct={ov.pct} t={t}/>
+        <div style={{display:"flex",gap:32}}>
+          {[[ov.done,"DONE",t.chem],[ov.left,"LEFT",t.muted],[ov.total,"TOTAL",t.text]].map(([v,l,c])=>(
+            <div key={l} style={{textAlign:"center"}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:20,fontWeight:700,color:c}}>{v}</div>
+              <div style={{fontSize:11,color:t.faint,marginTop:2}}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Sec label="Browse by Class" t={t}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          {[11,12].map(cl=>(
+            <div key={cl} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:16,flex:1,minWidth:140}}>
+              <div style={{fontSize:12,fontWeight:600,color:t.faint,marginBottom:10,letterSpacing:"0.06em"}}>CLASS {cl}</div>
+              {SO.map(sub=>{
+                const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[sub];
+                const s=stats(chapters,c=>c.sub===sub&&c.cls===cl);
+                return(
+                  <button key={sub} onClick={()=>onOpen(sub,cl)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",background:"transparent",border:"none",padding:"7px 0",cursor:"pointer"}}>
+                    <span style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14}}>{SM[sub].icon}</span>
+                      <span style={{fontSize:13,color:t.text}}>{SM[sub].label}</span>
+                    </span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:t.muted}}>{s.done}/{s.total}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </Sec>
+
+      <Sec label="By Subject" t={t}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+          {SO.map(s=><SubCard key={s} sub={s} chapters={chapters} onOpen={onOpen} t={t}/>)}
+        </div>
+      </Sec>
+
+      <Sec label="Statistics" t={t}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+          {[["📚","Total Chapters",ov.total,t.text],["✅","Completed",ov.done,t.chem],["⏳","Remaining",ov.left,t.physics],["📊","Completion",ov.pct+"%",t.maths]].map(([ico,lbl,val,col])=>(
+            <div key={lbl} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:12,padding:14}}>
+              <div style={{fontSize:20,marginBottom:6}}>{ico}</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:22,fontWeight:700,color:col}}>{val}</div>
+              <div style={{fontSize:11,color:t.faint,marginTop:4,letterSpacing:"0.04em"}}>{lbl.toUpperCase()}</div>
+            </div>
+          ))}
+        </div>
+      </Sec>
+    </div>
+  );
+}
+
+function Sec({label,children,t}){
+  return(
+    <div>
+      <div style={{fontSize:11,fontWeight:600,color:t.faint,letterSpacing:"0.1em",marginBottom:10}}>{label.toUpperCase()}</div>
+      {children}
+    </div>
+  );
+}
+
+/* ── CHAPTER ROW ── */
+function ChRow({chapter,index,color,t,actions}){
+  const [ed,setEd]=useState(false);
+  const [dn,setDn]=useState(chapter.name);
+  const [no,setNo]=useState(false);
+  const [noDraft,setNoDraft]=useState(chapter.notes||"");
+  const [del,setDel]=useState(false);
+  const commit=()=>{const v=dn.trim();if(v&&v!==chapter.name)actions.rename(chapter.id,v);else setDn(chapter.name);setEd(false);};
+  return(
+    <div style={{border:`1px solid ${chapter.done?color:t.border}`,borderRadius:12,background:chapter.done?color+"12":t.surface,padding:"12px 14px",display:"flex",flexDirection:"column",gap:8,transition:"all 0.2s"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={()=>actions.toggle(chapter.id)} style={{width:24,height:24,borderRadius:7,flexShrink:0,border:`2px solid ${chapter.done?color:t.borderL}`,background:chapter.done?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:13,fontWeight:700,transition:"all 0.2s"}}>
+          {chapter.done?"✓":""}
+        </button>
+        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:t.faint,width:22,flexShrink:0}}>{String(index+1).padStart(2,"0")}</span>
+        {ed
+          ?<input autoFocus value={dn} onChange={e=>setDn(e.target.value)} onBlur={commit} onKeyDown={e=>e.key==="Enter"&&commit()} style={{flex:1,background:t.raised,border:`1px solid ${t.borderL}`,borderRadius:6,padding:"5px 8px",color:t.text,fontSize:14,outline:"none"}}/>
+          :<span style={{flex:1,fontSize:14,color:chapter.done?t.muted:t.text,textDecoration:chapter.done?"line-through":"none",textDecorationColor:t.faint}}>{chapter.name}</span>
+        }
+        <div style={{display:"flex",gap:2,flexShrink:0}}>
+          <IB onClick={()=>setNo(v=>!v)} active={no||!!chapter.notes} t={t}>📝</IB>
+          <IB onClick={()=>setEd(true)} t={t}>✏️</IB>
+          {del
+            ?<><IB onClick={()=>actions.remove(chapter.id)} danger t={t}>✓</IB><IB onClick={()=>setDel(false)} t={t}>✕</IB></>
+            :<IB onClick={()=>setDel(true)} t={t}>🗑</IB>
+          }
+        </div>
+      </div>
+      {no&&<textarea value={noDraft} onChange={e=>setNoDraft(e.target.value)} onBlur={()=>actions.notes(chapter.id,noDraft)} placeholder="Notes, formulas, PYQs..." rows={2} style={{width:"100%",resize:"vertical",background:t.raised,border:`1px solid ${t.border}`,borderRadius:8,padding:8,color:t.text,fontSize:13,outline:"none",marginLeft:34}}/>}
+    </div>
+  );
+}
+function IB({children,onClick,active,danger,t}){
+  return(<button onClick={onClick} style={{width:30,height:30,borderRadius:7,border:"none",background:active?t.raised:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,opacity:danger?1:0.65,cursor:"pointer"}}>{children}</button>);
+}
+
+/* ── CHAPTERS VIEW ── */
+function ChaptersView({chapters,sub,cls,onBack,setCls,actions,onAdd,t}){
+  const m=SM[sub];
+  const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[sub];
+  const dim={physics:t.physicsDim,chemistry:t.chemDim,maths:t.mathsDim}[sub];
+  const [q,setQ]=useState("");
+  const [filt,setFilt]=useState("all");
+  const s=stats(chapters,c=>c.sub===sub&&c.cls===cls);
+  const list=useMemo(()=>chapters.filter(c=>c.sub===sub&&c.cls===cls).filter(c=>filt==="all"?true:filt==="done"?c.done:!c.done).filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>a.order-b.order),[chapters,sub,cls,filt,q]);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:t.muted,fontSize:13,padding:0,width:"fit-content",cursor:"pointer"}}>‹ Dashboard</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:dim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{m.icon}</div>
+          <div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,color:t.text}}>{m.label}</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:t.faint}}>{s.done}/{s.total} · {s.pct}%</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {[11,12].map(c=><Pill key={c} active={cls===c} onClick={()=>setCls(c)} color={col} t={t}>Class {c}</Pill>)}
+        </div>
+      </div>
+      <TickBar pct={s.pct} color={col}/>
+      <div style={{display:"flex",alignItems:"center",gap:8,background:t.surface,border:`1px solid ${t.border}`,borderRadius:10,padding:"8px 12px"}}>
+        <span>🔍</span>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search chapters..." style={{flex:1,background:"transparent",border:"none",outline:"none",color:t.text,fontSize:14}}/>
+        {q&&<button onClick={()=>setQ("")} style={{background:"none",border:"none",color:t.faint,fontSize:18,cursor:"pointer"}}>×</button>}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:6}}>
+          {[["all","All"],["done","Completed"],["left","Remaining"]].map(([v,l])=><Pill key={v} active={filt===v} onClick={()=>setFilt(v)} color={col} t={t}>{l}</Pill>)}
+        </div>
+        <button onClick={()=>onAdd(sub,cls)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,border:"none",background:col,color:"white",fontWeight:600,fontSize:13,cursor:"pointer"}}>+ Add Chapter</button>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {list.length===0
+          ?<div style={{textAlign:"center",padding:"36px 0",color:t.faint,fontSize:13}}>No chapters found.</div>
+          :list.map((ch,i)=><ChRow key={ch.id} chapter={ch} index={i} color={col} t={t} actions={actions}/>)
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ── ADD MODAL ── */
+function AddModal({initSub,initCls,onClose,onSubmit,t}){
+  const [cls,setCls]=useState(initCls||11);
+  const [sub,setSub]=useState(initSub||"physics");
+  const [name,setName]=useState("");
+  const ref=useRef(null);
+  useEffect(()=>{ref.current?.focus();},[]);
+  const submit=()=>{const v=name.trim();if(!v)return;onSubmit({cls,sub,name:v});onClose();};
+  const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[sub];
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:16,padding:22,width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:16,color:t.text}}>Add Chapter</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.faint,fontSize:22,cursor:"pointer"}}>×</button>
+        </div>
+        <div><div style={{fontSize:11,color:t.faint,marginBottom:6}}>CLASS</div><div style={{display:"flex",gap:8}}>{[11,12].map(c=><Pill key={c} active={cls===c} onClick={()=>setCls(c)} t={t}>Class {c}</Pill>)}</div></div>
+        <div><div style={{fontSize:11,color:t.faint,marginBottom:6}}>SUBJECT</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{SO.map(s=>{const c={physics:t.physics,chemistry:t.chem,maths:t.maths}[s];return<Pill key={s} active={sub===s} onClick={()=>setSub(s)} color={c} t={t}>{SM[s].label}</Pill>})}</div></div>
+        <div>
+          <div style={{fontSize:11,color:t.faint,marginBottom:6}}>CHAPTER NAME</div>
+          <input ref={ref} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. Rotational Dynamics" style={{width:"100%",background:t.raised,border:`1px solid ${t.borderL}`,borderRadius:8,padding:"9px 10px",color:t.text,fontSize:14,outline:"none"}}/>
+        </div>
+        <button onClick={submit} disabled={!name.trim()} style={{padding:"11px 0",borderRadius:10,border:"none",background:name.trim()?col:t.border,color:name.trim()?"white":t.faint,fontWeight:600,fontSize:14,cursor:name.trim()?"pointer":"not-allowed"}}>Add Chapter</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── SEARCH MODAL ── */
+function SearchModal({chapters,onClose,onJump,t}){
+  const [q,setQ]=useState("");
+  const ref=useRef(null);
+  useEffect(()=>{ref.current?.focus();},[]);
+  const res=useMemo(()=>!q.trim()?[]:chapters.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).slice(0,30),[chapters,q]);
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:50,padding:16,paddingTop:"10vh"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:16,width:"100%",maxWidth:440,maxHeight:"70vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${t.border}`}}>
+          <span>🔍</span>
+          <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search all chapters..." style={{flex:1,background:"transparent",border:"none",outline:"none",color:t.text,fontSize:15}}/>
+          <button onClick={onClose} style={{background:"none",border:"none",color:t.faint,fontSize:22,cursor:"pointer"}}>×</button>
+        </div>
+        <div style={{overflowY:"auto",padding:8}}>
+          {q.trim()&&res.length===0&&<div style={{padding:20,textAlign:"center",color:t.faint,fontSize:13}}>No chapters found.</div>}
+          {res.map(ch=>{
+            const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[ch.sub];
+            return(
+              <button key={ch.id} onClick={()=>onJump(ch.sub,ch.cls)} style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"10px",borderRadius:10,border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}}
+                onMouseEnter={e=>e.currentTarget.style.background=t.raised} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{width:8,height:8,borderRadius:99,background:col,display:"inline-block",flexShrink:0}}/>
+                  <span style={{fontSize:14,color:t.text}}>{ch.name}</span>
+                </span>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:t.faint,flexShrink:0}}>{SM[ch.sub].label.slice(0,4)} · {ch.cls}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── APP ── */
+function App(){
+  const [theme,setTheme]=useState(loadTheme);
+  const t=theme==="dark"?DARK:LIGHT;
+  const [chapters,setChapters]=useState([]);
+  const [loaded,setLoaded]=useState(false);
+  const [view,setView]=useState("dash");
+  const [activeSub,setActiveSub]=useState("physics");
+  const [activeCls,setActiveCls]=useState(11);
+  const [addModal,setAddModal]=useState(null);
+  const [searchOpen,setSearchOpen]=useState(false);
+
+  useEffect(()=>{
+    const stored=load();
+    setChapters(stored&&stored.length?stored:buildDefault());
+    setLoaded(true);
+  },[]);
+
+  const toggleTheme=()=>setTheme(prev=>{const n=prev==="dark"?"light":"dark";localStorage.setItem(TKEY,n);return n;});
+
+  const commit=useCallback(fn=>setChapters(prev=>{const next=fn(prev);save(next);return next;}),[]);
+  const actions={
+    toggle:id=>commit(p=>p.map(c=>c.id===id?{...c,done:!c.done}:c)),
+    rename:(id,name)=>commit(p=>p.map(c=>c.id===id?{...c,name}:c)),
+    notes:(id,notes)=>commit(p=>p.map(c=>c.id===id?{...c,notes}:c)),
+    remove:id=>commit(p=>p.filter(c=>c.id!==id)),
+    add:({cls,sub,name})=>commit(p=>{const mo=Math.max(-1,...p.filter(c=>c.cls===cls&&c.sub===sub).map(c=>c.order));return[...p,{id:`c${Date.now()}`,cls,sub,name,done:false,notes:"",order:mo+1}];})
+  };
+
+  if(!loaded)return<div style={{minHeight:"100vh",background:t.bg,display:"flex",alignItems:"center",justifyContent:"center",color:t.faint,fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>Loading...</div>;
+
+  return(
+    <div style={{minHeight:"100vh",background:t.bg,transition:"background 0.3s"}}>
+      <style>{`body{background:${t.bg}} ::-webkit-scrollbar-thumb{background:${t.border}}`}</style>
+
+      {/* ── HEADER ── */}
+      <div style={{position:"sticky",top:0,zIndex:40,background:t.bg,borderBottom:`1px solid ${t.border}`,backdropFilter:"blur(12px)"}}>
+        <div style={{maxWidth:720,margin:"0 auto",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Logo size={40}/>
+            <div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:16,color:t.text,lineHeight:1}}>JEE TRACKER</div>
+              <div style={{fontFamily:"'Inter',sans-serif",fontSize:11,color:t.faint,marginTop:2}}>Master Class 11 & 12</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={()=>setSearchOpen(true)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16}}>🔍</button>
+            {/* ── THEME TOGGLE ── */}
+            <button onClick={toggleTheme} title={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:17,transition:"all 0.2s"}}>
+              {theme==="dark"?"☀️":"🌙"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENT ── */}
+      <div style={{maxWidth:720,margin:"0 auto",padding:"22px 16px 80px"}}>
+        {view==="dash"
+          ?<Dashboard chapters={chapters} onOpen={(s,c)=>{setActiveSub(s);setActiveCls(c);setView("chapters");}} onSearch={()=>setSearchOpen(true)} t={t}/>
+          :<ChaptersView chapters={chapters} sub={activeSub} cls={activeCls} onBack={()=>setView("dash")} setCls={setActiveCls} actions={actions} onAdd={(s,c)=>setAddModal({sub:s,cls:c})} t={t}/>
+        }
+      </div>
+
+      {addModal&&<AddModal initSub={addModal.sub} initCls={addModal.cls} onClose={()=>setAddModal(null)} onSubmit={actions.add} t={t}/>}
+      {searchOpen&&<SearchModal chapters={chapters} onClose={()=>setSearchOpen(false)} onJump={(s,c)=>{setSearchOpen(false);setActiveSub(s);setActiveCls(c);setView("chapters");}} t={t}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
