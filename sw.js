@@ -25,9 +25,20 @@ self.addEventListener("activate", e => {
   self.clients.claim();
 });
 
-// Fetch: serve from cache, fall back to network
+// Fetch: network first, fall back to cache
+// This means app always tries to get latest version from GitHub first
 self.addEventListener("fetch", e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(networkResponse => {
+        // Got fresh response — update the cache
+        const clone = networkResponse.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return networkResponse;
+      })
+      .catch(() => {
+        // No internet — serve from cache
+        return caches.match(e.request);
+      })
   );
 });
