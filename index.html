@@ -348,7 +348,7 @@ function ChRow({chapter,index,color,t,actions}){
           }
         </div>
       </div>
-      {no&&<textarea value={noDraft} onChange={e=>setNoDraft(e.target.value)} onBlur={()=>actions.notes(chapter.id,noDraft)} placeholder="Notes, formulas, PYQs..." rows={2} style={{width:"100%",resize:"vertical",background:t.raised,border:`1px solid ${t.border}`,borderRadius:8,padding:8,color:t.text,fontSize:13,outline:"none",marginLeft:34}}/>}
+      {no&&<textarea value={noDraft} onChange={e=>setNoDraft(e.target.value)} onBlur={()=>actions.notes(chapter.id,noDraft)} placeholder="Notes, formulas, PYQs..." rows={3} style={{width:"100%",resize:"vertical",background:t.raised,border:`1px solid ${t.border}`,borderRadius:8,padding:10,color:t.text,fontSize:13,outline:"none",marginTop:4}}/>}
     </div>
   );
 }
