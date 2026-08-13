@@ -171,11 +171,90 @@ function SubCard({sub,chapters,onOpen,t}){
   );
 }
 
+
+/* ── DAILY QUOTE ── */
+const QUOTES = [
+  ["Every chapter you complete today is a rank secured tomorrow.",""],
+  ["IIT doesn't select the smartest. It selects the most consistent.",""],
+  ["The pain of discipline is far less than the pain of regret.",""],
+  ["Your JEE 2027 success story starts with today's chapter.",""],
+  ["Small daily improvements lead to stunning yearly results.",""],
+  ["Don't wish it were easier. Wish you were better.","Jim Rohn"],
+  ["One chapter at a time. One day at a time. One rank at a time.",""],
+  ["The student who studies when they don't feel like it becomes the ranker.",""],
+  ["Toppers weren't born toppers. They were built by daily habits.",""],
+  ["Your future self is watching you right now. Don't let them down.",""],
+  ["JEE 2027 — 365 days of choices. Make today count.",""],
+  ["An hour of focused study beats five hours of distracted effort.",""],
+  ["Revise what you studied yesterday. Master what you study today.",""],
+  ["The rank you want is on the other side of the chapter you're avoiding.",""],
+  ["Be so consistent that success has no choice but to find you.",""],
+  ["Every mock test is a dress rehearsal for JEE 2027.",""],
+  ["Physics, Chemistry, Maths — three subjects. One dream. Stay focused.",""],
+  ["The secret to getting ahead is getting started.","Mark Twain"],
+  ["It always seems impossible until it's done.","Nelson Mandela"],
+  ["Hard work beats talent when talent doesn't work hard.","Tim Notke"],
+  ["Study not to pass the exam. Study to understand the concept.",""],
+  ["PYQs today. AIR tomorrow.",""],
+  ["A year from now, you'll wish you had started today.","Karen Lamb"],
+  ["Confusion is the beginning of understanding. Keep going.",""],
+  ["Sleep is not laziness. A well-rested mind solves faster.",""],
+  ["Clear your doubts today. Don't carry them to the exam hall.",""],
+  ["You are one chapter away from a breakthrough.",""],
+  ["JEE rewards those who show up every single day.",""],
+  ["Don't compare your chapter 1 to someone else's chapter 20.",""],
+  ["Discipline is choosing between what you want now and what you want most.","Abraham Lincoln"],
+  ["Every formula you memorise is a weapon in the exam hall.",""],
+  ["Success in JEE is the sum of small efforts, repeated daily.","Robert Collier"],
+  ["The difference between ordinary and extraordinary is practice.",""],
+  ["Think like a topper. Study like a topper. Become a topper.",""],
+  ["Your only competition is who you were yesterday.",""],
+  ["IIT 2027 — it's not a dream. It's a plan.",""],
+  ["When you feel like quitting, remember why you started.",""],
+  ["Solve one more problem. Revise one more concept. Every day.",""],
+  ["The mind is sharpened by the problems it chooses to solve.",""],
+  ["Consistency over intensity. Show up every day.",""],
+  ["Doubt kills more dreams than failure ever will.","Suzy Kassem"],
+  ["Your rank is decided today, not on exam day.",""],
+  ["Master the basics. The advanced will take care of itself.",""],
+  ["The best time to study was yesterday. The next best time is now.",""],
+  ["Marks follow understanding. Understanding follows effort.",""],
+  ["JEE 2027 — write it down. Make it real. Work for it.",""],
+  ["A focused mind in a distracted world is a superpower.",""],
+  ["Each problem you solve adds one brick to your IIT.",""],
+  ["No shortcut leads to IIT. But every chapter gets you closer.",""],
+  ["Stay hungry for knowledge. Stay humble in revision.",""],
+];
+
+function DailyQuote({t}){
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now - start;
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const [text, author] = QUOTES[dayOfYear % QUOTES.length];
+  
+  // Days until JEE 2027 (approx April 4, 2027)
+  const jeeDate = new Date(2027, 0, 22); // JEE Main 2027 Session 1
+  const daysLeft = Math.ceil((jeeDate - now) / (1000*60*60*24));
+  
+  return(
+    <div style={{background:`linear-gradient(135deg, ${t.surface} 0%, ${t.raised} 100%)`,border:`1px solid ${t.border}`,borderRadius:16,padding:"16px 18px",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:11,fontWeight:600,color:t.physics,letterSpacing:"0.1em"}}>✨ TODAY'S MOTIVATION</span>
+        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:t.danger,fontWeight:700}}>{daysLeft}d to JEE Main S1 2027</span>
+      </div>
+      <p style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:15,color:t.text,lineHeight:1.5,margin:0}}>"{text}"</p>
+      {author && <span style={{fontSize:12,color:t.muted,fontStyle:"italic"}}>— {author}</span>}
+    </div>
+  );
+}
+
 /* ── DASHBOARD ── */
 function Dashboard({chapters,onOpen,onSearch,t}){
   const ov=stats(chapters,()=>true);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:24}}>
+      <DailyQuote t={t}/>
       <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:18,padding:"20px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
         <Gauge pct={ov.pct} t={t}/>
         <div style={{display:"flex",gap:32}}>
@@ -189,20 +268,20 @@ function Dashboard({chapters,onOpen,onSearch,t}){
       </div>
 
       <Sec label="Browse by Class" t={t}>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {[11,12].map(cl=>(
-            <div key={cl} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:16,flex:1,minWidth:140}}>
+            <div key={cl} style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:16,width:"100%"}}>
               <div style={{fontSize:12,fontWeight:600,color:t.faint,marginBottom:10,letterSpacing:"0.06em"}}>CLASS {cl}</div>
               {SO.map(sub=>{
                 const col={physics:t.physics,chemistry:t.chem,maths:t.maths}[sub];
                 const s=stats(chapters,c=>c.sub===sub&&c.cls===cl);
                 return(
                   <button key={sub} onClick={()=>onOpen(sub,cl)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",background:"transparent",border:"none",padding:"7px 0",cursor:"pointer"}}>
-                    <span style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
                       <span style={{fontSize:14}}>{SM[sub].icon}</span>
                       <span style={{fontSize:13,color:t.text}}>{SM[sub].label}</span>
                     </span>
-                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:t.muted}}>{s.done}/{s.total}</span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:t.muted,flexShrink:0}}>{s.done}/{s.total}</span>
                   </button>
                 );
               })}
